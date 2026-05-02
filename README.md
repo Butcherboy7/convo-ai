@@ -119,29 +119,31 @@ See [HANDOFF.md](HANDOFF.md) for detailed technical specifications and the curre
 
 ---
 
-## 🌍 Deployment (All-on-Render)
+## 🚀 Deployment (AWS - Recommended)
 
-You can deploy the entire project (Website + Agent + API) to Render in one go.
+Since you have AWS credits, this is the best way to run Maya with high performance.
 
-### 1. Push to GitHub
-Ensure your latest changes are on GitHub:
-```bash
-git add .
-git commit -m "All-on-Render deployment"
-git push origin main
-```
+### 1. Backend (AWS App Runner)
+1.  Go to **[AWS App Runner](https://console.aws.amazon.com/apprunner/home)**.
+2.  Click **Create Service**.
+3.  Source: **Source code repository**, connect your GitHub.
+4.  Repo: `convo-ai`, Branch: `main`, Deployment: **Automatic**.
+5.  Build Settings: 
+    *   Configuration source: **Configure all settings here**
+    *   Runtime: **Docker**
+6.  Service Configuration:
+    *   Port: **8000**
+    *   **Environment Variables**: Add your `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `GROQ_API_KEY`, and `CARTESIA_API_KEY`.
+7.  Click **Create Service**. Once live, copy the URL (e.g., `https://xxxx.awsapprunner.com`).
 
-### 2. One-Click Deploy
-1. Log in to [Render](https://dashboard.render.com/).
-2. Click **New +** > **Blueprint**.
-3. Connect your GitHub repository.
-4. Render will find the `render.yaml` file. Click **Apply**.
-5. Enter your **API Keys** into the "tutor-secrets" group when prompted.
+### 2. Frontend (AWS Amplify)
+1.  Go to **[AWS Amplify](https://console.aws.amazon.com/amplify/home)**.
+2.  Click **New App** > **Host web app**.
+3.  Connect your GitHub repo.
+4.  **Advanced Settings**: Add an Environment Variable:
+    *   Key: `VITE_TOKEN_SERVER_URL`
+    *   Value: `https://YOUR-APP-RUNNER-URL.com/token`
+5.  Click **Save and Deploy**.
 
-### 3. Final Connection
-Once the services are created:
-1. Copy the URL of your **tutor-api** service (e.g., `https://tutor-api.onrender.com`).
-2. Go to your **tutor-frontend** settings on Render.
-3. Find **Environment Variables** and update `VITE_TOKEN_SERVER_URL` to: `https://YOUR-URL.onrender.com/token`.
-4. Render will re-deploy your site, and you'll be live!
+**Maya is now live on AWS!**
 

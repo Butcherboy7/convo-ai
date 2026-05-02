@@ -126,6 +126,11 @@ async def new_session():
     return {"status": "cleared"}
 
 
+@app.get("/")
+async def root_health_check():
+    """Root endpoint for AWS/Render health checks."""
+    return {"status": "alive", "service": "maya-tutor-backend"}
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "language-tutor-token-server"}
