@@ -4,7 +4,7 @@ services:
     name: tutor-api
     env: docker
     dockerContext: agent
-    dockerfilePath: Dockerfile
+    dockerfilePath: agent/Dockerfile
     plan: free # Can be changed to 'starter' for better performance
     envVars:
       - key: PORT
@@ -16,7 +16,7 @@ services:
     name: tutor-agent
     env: docker
     dockerContext: agent
-    dockerfilePath: Dockerfile
+    dockerfilePath: agent/Dockerfile
     # Override command to run the agent instead of token server
     dockerCommand: python agent.py start
     plan: free # Note: Free workers may have limitations
