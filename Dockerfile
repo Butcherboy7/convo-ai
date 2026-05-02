@@ -24,5 +24,9 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Default command (will be overridden by render.yaml)
-CMD ["python", "token_server.py"]
+# Copy the startup script and make it executable
+COPY agent/start.sh .
+RUN chmod +x start.sh
+
+# Start both services
+CMD ["./start.sh"]

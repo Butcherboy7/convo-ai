@@ -1,29 +1,17 @@
 services:
-  # 1. The Token Server (Web Service)
+  # Combined Backend (Token Server + AI Agent)
   - type: web
-    name: tutor-api
+    name: tutor-backend
     env: docker
     dockerContext: .
     dockerfilePath: Dockerfile
-    plan: free # Can be changed to 'starter' for better performance
+    plan: free
     envVars:
       - key: PORT
         value: 8000
       - fromGroup: tutor-secrets
 
-  # 2. The AI Agent (Background Worker)
-  - type: worker
-    name: tutor-agent
-    env: docker
-    dockerContext: .
-    dockerfilePath: Dockerfile
-    # Override command to run the agent instead of token server
-    dockerCommand: python agent.py start
-    plan: free # Note: Free workers may have limitations
-    envVars:
-      - fromGroup: tutor-secrets
-
-  # 3. The Frontend (Static Site)
+  # Frontend (Static Site)
   - type: web
     name: tutor-frontend
     env: static
@@ -31,9 +19,7 @@ services:
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_TOKEN_SERVER_URL
-        # This will be your API URL + /token
-        # Render doesn't know the URL yet, so you'll update this once!
-        value: https://tutor-api.onrender.com/token
+        value: https://tutor-backend.onrender.com/token
 
 envVarGroups:
   - name: tutor-secrets
