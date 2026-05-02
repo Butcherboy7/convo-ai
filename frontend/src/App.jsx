@@ -187,7 +187,8 @@ function AppLayout({ sessionSummary, onSessionSummary, onNewSession }) {
         onSessionSummary(payload);
         // Tell token server to invalidate the current room
         // so the next session gets a fresh room with one agent
-        fetch('/api/new-session', { method: 'POST' }).catch(() => {});
+        const baseUrl = (import.meta.env.VITE_TOKEN_SERVER_URL || '/api/token').replace('/token', '');
+        fetch(`${baseUrl}/new-session`, { method: 'POST' }).catch(() => {});
       }
       
       if (payload.type === "config") {
@@ -309,9 +310,9 @@ export default function App() {
     setPhase('loading');
     setErrorMessage(null);
     try {
-      // Use the Vite proxy path — never call port 8000 directly from browser
       const identity = getOrCreateIdentity();
-      const response = await fetch(`/api/token?identity=${encodeURIComponent(identity)}`);
+      const tokenUrl = import.meta.env.VITE_TOKEN_SERVER_URL || '/api/token';
+      const response = await fetch(`${tokenUrl}?identity=${encodeURIComponent(identity)}`);
       if (!response.ok) {
         setPhase('error');
         setErrorMessage("Token server error. Check agent terminal for details.");
@@ -331,7 +332,8 @@ export default function App() {
   // dispatches exactly one new agent to a new room.
   const startNewSession = async () => {
     try {
-      await fetch('/api/new-session', { method: 'POST' });
+      const baseUrl = (import.meta.env.VITE_TOKEN_SERVER_URL || '/api/token').replace('/token', '');
+      await fetch(`${baseUrl}/new-session`, { method: 'POST' });
     } catch (e) {
       // Non-critical — the token endpoint will still create a new room
       // if the old one expired
