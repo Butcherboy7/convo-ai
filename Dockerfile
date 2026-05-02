@@ -10,12 +10,12 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install
-COPY requirements.txt .
+# Copy requirements and install from agent folder
+COPY agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the agent code
-COPY . .
+# Copy everything from agent folder into /app
+COPY agent/ .
 
 # Expose port (only needed for Token Server, but harmless for Agent)
 EXPOSE 8000
