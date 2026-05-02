@@ -117,3 +117,32 @@ The project follows a "Thin Client, Thick Agent" philosophy:
 
 See [HANDOFF.md](HANDOFF.md) for detailed technical specifications and the current development roadmap.
 
+## 🌍 Deployment (Render)
+
+Deploying to the cloud is easy with Render. Follow these steps:
+
+### 1. Push to GitHub
+Ensure your latest changes are on GitHub:
+```bash
+git add .
+git commit -m "Add deployment config"
+git push origin main
+```
+
+### 2. Deploy the Backend (Render)
+1. Log in to [Render](https://dashboard.render.com/).
+2. Click **New +** > **Blueprint**.
+3. Connect your GitHub repository.
+4. Render will find the `render.yaml` file. Click **Apply**.
+5. It will ask for your **API Keys**. Enter them into the "tutor-secrets" group.
+6. Once deployed, copy your **Web Service URL** (e.g., `https://tutor-api.onrender.com`).
+
+### 3. Deploy the Frontend (Vercel)
+1. Go to [Vercel](https://vercel.com/) and click **Add New** > **Project**.
+2. Connect your GitHub repository.
+3. **Important**: Set the Environment Variable:
+   - Key: `VITE_TOKEN_SERVER_URL`
+   - Value: `https://YOUR-RENDER-URL.onrender.com/token`
+4. Click **Deploy**.
+
+**Maya is now live!** Your Vercel URL is your public tutoring app.

@@ -1,0 +1,33 @@
+services:
+  # 1. The Token Server (Web Service)
+  - type: web
+    name: tutor-api
+    env: docker
+    dockerContext: agent
+    dockerfilePath: Dockerfile
+    plan: free # Can be changed to 'starter' for better performance
+    envVars:
+      - key: PORT
+        value: 8000
+      - fromGroup: tutor-secrets
+
+  # 2. The AI Agent (Background Worker)
+  - type: worker
+    name: tutor-agent
+    env: docker
+    dockerContext: agent
+    dockerfilePath: Dockerfile
+    # Override command to run the agent instead of token server
+    dockerCommand: python agent.py start
+    plan: free # Note: Free workers may have limitations
+    envVars:
+      - fromGroup: tutor-secrets
+
+envVarGroups:
+  - name: tutor-secrets
+    envVars:
+      - key: LIVEKIT_URL
+      - key: LIVEKIT_API_KEY
+      - key: LIVEKIT_API_SECRET
+      - key: GROQ_API_KEY
+      - key: CARTESIA_API_KEY
