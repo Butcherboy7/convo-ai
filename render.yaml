@@ -39,7 +39,12 @@ envVarGroups:
   - name: tutor-secrets
     envVars:
       - key: LIVEKIT_URL
+        value: "REPLACE_ME"
       - key: LIVEKIT_API_KEY
+        value: "REPLACE_ME"
       - key: LIVEKIT_API_SECRET
+        value: "REPLACE_ME"
       - key: GROQ_API_KEY
+        value: "REPLACE_ME"
       - key: CARTESIA_API_KEY
+        value: "REPLACE_ME"
