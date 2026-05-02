@@ -30,49 +30,80 @@ Built with **LiveKit Components**, **Groq (Llama 3 & Whisper)**, and **Cartesia*
 
 ## 🚀 Getting Started (Spoon-fed)
 
-Follow these steps exactly to get Maya running on your own machine.
+Follow these steps exactly to get your own AI Tutor running.
 
 ### 1. Prerequisites
+Before you start, make sure you have these installed:
 - **Python 3.12+**: [Download here](https://www.python.org/downloads/)
 - **Node.js 18+**: [Download here](https://nodejs.org/)
-- **API Keys**: You need accounts and keys for:
-  - [LiveKit Cloud](https://cloud.livekit.io) (Project URL, API Key, API Secret)
-  - [Groq](https://console.groq.com) (API Key)
-  - [Cartesia](https://play.cartesia.ai) (API Key)
 
-### 2. Setup the Backend (Agent & Token Server)
-1. Open a terminal and navigate to the project folder.
-2. Go into the agent folder: `cd agent`
-3. Create a virtual environment: `python -m venv venv`
-4. Activate it:
-   - **Windows**: `venv\Scripts\activate`
-   - **Mac/Linux**: `source venv/bin/activate`
-5. Install dependencies: `pip install -r requirements.txt`
-6. Create your environment file: `cp .env.example .env` (or just rename `.env.example` to `.env`)
-7. **Open `.env` in a text editor** and paste your API keys from step 1.
-8. Verify everything is correct: `python verify_env.py`
+You also need to grab your API keys from:
+- [LiveKit Cloud](https://cloud.livekit.io) (Project URL, API Key, API Secret)
+- [Groq](https://console.groq.com) (API Key)
+- [Cartesia](https://play.cartesia.ai) (API Key)
 
-### 3. Setup the Frontend
-1. Open a **new** terminal (keep the first one open).
-2. Go into the frontend folder: `cd frontend`
-3. Install dependencies: `npm install`
+---
 
-### 4. How to Run (3 Steps)
-You need to have 3 terminals running at the same time:
+### 2. Installation (Step-by-Step)
 
-- **Terminal 1 (Token Server)**: 
-  `cd agent && python token_server.py`
-  *(This handles security and room access)*
+#### Step A: Clone the Project
+Open your terminal/command prompt and run:
+```bash
+git clone https://github.com/Butcherboy7/convo-ai.git
+cd convo-ai
+```
 
-- **Terminal 2 (AI Agent)**: 
-  `cd agent && python agent.py dev`
-  *(This is Maya's brain. Keep this running!)*
+#### Step B: Setup the Backend
+In the same terminal, run these commands one by one:
+```bash
+cd agent
+python -m venv venv
 
-- **Terminal 3 (Frontend)**: 
-  `cd frontend && npm run dev`
-  *(This starts the website)*
+# On Windows:
+venv\Scripts\activate
+# On Mac/Linux:
+source venv/bin/activate
 
-Once all three are running, open **[http://localhost:5173](http://localhost:5173)** in your browser and start talking!
+pip install -r requirements.txt
+cp .env.example .env
+```
+**Now, open the `agent/.env` file** in your favorite text editor (Notepad, VS Code, etc.) and paste your API keys into the quotes.
+
+#### Step C: Setup the Frontend
+Open a **new terminal window**, navigate to the project folder, and run:
+```bash
+cd frontend
+npm install
+```
+
+---
+
+### 3. How to Run (Keep all 3 terminals open!)
+
+To start the tutor, you need to have **3 terminals** running at the same time:
+
+**Terminal 1: Token Server**
+```bash
+cd agent
+# (Make sure venv is active)
+python token_server.py
+```
+
+**Terminal 2: AI Agent (Maya's Brain)**
+```bash
+cd agent
+# (Make sure venv is active)
+python agent.py dev
+```
+
+**Terminal 3: Frontend (The Website)**
+```bash
+cd frontend
+npm run dev
+```
+
+**Done!** Now open **[http://localhost:5173](http://localhost:5173)** in your browser and click "Start Session".
+
 
 
 ---
