@@ -90,36 +90,16 @@ async def get_token(request: Request):
                 api_secret=api_secret,
             )
             try:
-                # Ensure the room exists before dispatching — LiveKit creates rooms
-                # lazily on first join, but dispatch needs the room to exist already.
-                await lk.room.create_room(
-                    livekit_api.CreateRoomRequest(
-                        name=room_name,
-                        empty_timeout=300,  # 5 min idle timeout
+                # Trigger dispatch immediately — LiveKit handles duplicates automatically.
+                await lk.agent_dispatch.create_dispatch(
+                    livekit_api.CreateAgentDispatchRequest(
+                        agent_name="maya-tutor",
+                        room=room_name,
                     )
                 )
-
-                room_info = await lk.room.list_participants(
-                    livekit_api.ListParticipantsRequest(room=room_name)
-                )
-                agent_already_present = any(
-                    p.identity.startswith("agent-") or "maya" in p.identity.lower()
-                    for p in room_info.participants
-                )
-
-                if not agent_already_present:
-                    await lk.agent_dispatch.create_dispatch(
-                        livekit_api.CreateAgentDispatchRequest(
-                            agent_name="maya-tutor",
-                            room=room_name,
-                        )
-                    )
-                    logger.info(f"Agent dispatch triggered for room: {room_name}")
-                else:
-                    logger.info("Agent already in room — skipping dispatch")
+                logger.info(f"Agent dispatch triggered for room: {room_name}")
             except Exception as e:
-                logger.warning(f"Agent dispatch check failed: {e}")
-                # Do not block token issuance if dispatch check fails
+                logger.warning(f"Agent dispatch failed: {e}")
             finally:
                 await lk.aclose()
         except Exception as e:
