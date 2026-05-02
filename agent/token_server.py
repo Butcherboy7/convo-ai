@@ -11,6 +11,8 @@ import uuid
 import time
 import datetime
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from livekit import api as livekit_api
@@ -126,10 +128,15 @@ async def new_session():
     return {"status": "cleared"}
 
 
-@app.get("/")
-async def root_health_check():
-    """Root endpoint for AWS/Render health checks."""
-    return {"status": "alive", "service": "maya-tutor-backend"}
+# Mount the frontend static files (if they exist)
+import os
+frontend_path = os.path.join(os.path.dirname(__file__), "../frontend/dist")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+else:
+    @app.get("/")
+    async def root_health_check():
+        return {"status": "alive", "service": "maya-tutor-backend (frontend not built)"}
 
 @app.get("/health")
 def health_check():

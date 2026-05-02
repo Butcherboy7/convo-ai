@@ -1,32 +1,41 @@
-# Use Python 3.12 slim image
-FROM python:3.12-slim
+# Use Python 3.11 as the base image
+FROM python:3.11-slim
 
-# Install system dependencies for audio/LiveKit
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
     curl \
+    git \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js (for building the frontend)
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install from agent folder
-COPY agent/requirements.txt .
+# Copy the entire project
+COPY . .
+
+# Build the Frontend
+WORKDIR /app/frontend
+RUN npm install
+# Set the token server URL to relative path for the all-in-one setup
+ENV VITE_TOKEN_SERVER_URL=/token
+RUN npm run build
+
+# Set up the Backend
+WORKDIR /app/agent
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy everything from agent folder into /app
-COPY agent/ .
-
-# Expose port (only needed for Token Server, but harmless for Agent)
-EXPOSE 8000
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# Copy the startup script and make it executable
-COPY agent/start.sh .
+# Create the start script
+WORKDIR /app
+RUN echo '#!/bin/bash\ncd /app/agent\npython token_server.py &\npython agent.py start' > start.sh
 RUN chmod +x start.sh
 
-# Start both services
+# Expose the port (FastAPI will run on 8000)
+EXPOSE 8000
+
+# Start the combined services
 CMD ["./start.sh"]
