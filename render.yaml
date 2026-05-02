@@ -23,6 +23,18 @@ services:
     envVars:
       - fromGroup: tutor-secrets
 
+  # 3. The Frontend (Static Site)
+  - type: static
+    name: tutor-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_TOKEN_SERVER_URL
+        # This will be your API URL + /token
+        # Render doesn't know the URL yet, so you'll update this once!
+        value: https://tutor-api.onrender.com/token
+
 envVarGroups:
   - name: tutor-secrets
     envVars:

@@ -117,32 +117,31 @@ The project follows a "Thin Client, Thick Agent" philosophy:
 
 See [HANDOFF.md](HANDOFF.md) for detailed technical specifications and the current development roadmap.
 
-## 🌍 Deployment (Render)
+---
 
-Deploying to the cloud is easy with Render. Follow these steps:
+## 🌍 Deployment (All-on-Render)
+
+You can deploy the entire project (Website + Agent + API) to Render in one go.
 
 ### 1. Push to GitHub
 Ensure your latest changes are on GitHub:
 ```bash
 git add .
-git commit -m "Add deployment config"
+git commit -m "All-on-Render deployment"
 git push origin main
 ```
 
-### 2. Deploy the Backend (Render)
+### 2. One-Click Deploy
 1. Log in to [Render](https://dashboard.render.com/).
 2. Click **New +** > **Blueprint**.
 3. Connect your GitHub repository.
 4. Render will find the `render.yaml` file. Click **Apply**.
-5. It will ask for your **API Keys**. Enter them into the "tutor-secrets" group.
-6. Once deployed, copy your **Web Service URL** (e.g., `https://tutor-api.onrender.com`).
+5. Enter your **API Keys** into the "tutor-secrets" group when prompted.
 
-### 3. Deploy the Frontend (Vercel)
-1. Go to [Vercel](https://vercel.com/) and click **Add New** > **Project**.
-2. Connect your GitHub repository.
-3. **Important**: Set the Environment Variable:
-   - Key: `VITE_TOKEN_SERVER_URL`
-   - Value: `https://YOUR-RENDER-URL.onrender.com/token`
-4. Click **Deploy**.
+### 3. Final Connection
+Once the services are created:
+1. Copy the URL of your **tutor-api** service (e.g., `https://tutor-api.onrender.com`).
+2. Go to your **tutor-frontend** settings on Render.
+3. Find **Environment Variables** and update `VITE_TOKEN_SERVER_URL` to: `https://YOUR-URL.onrender.com/token`.
+4. Render will re-deploy your site, and you'll be live!
 
-**Maya is now live!** Your Vercel URL is your public tutoring app.
