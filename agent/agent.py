@@ -4,11 +4,11 @@ Pipeline: Silero VAD → Groq Whisper STT → Groq Llama LLM → Cartesia TTS
 State lives here. Browser renders only. Token server signs only.
 All agent↔browser communication goes through LiveKit data channel topic: tutor-events
 """
-
 import os
 import sys
 import logging
 import json
+import time
 import asyncio
 from dotenv import load_dotenv
 from livekit import rtc
@@ -17,7 +17,6 @@ from livekit.agents import (
     Agent,
     JobContext,
     WorkerOptions,
-    RoomInputOptions,
     cli,
     WorkerType,
 )
@@ -44,36 +43,37 @@ if missing:
     sys.exit(1)
 logger.info("All environment variables validated — starting agent worker")
 
-TUTOR_SYSTEM_PROMPT = """You are Maya, a warm and genuinely encouraging 
-spoken language tutor. You are having a live voice conversation with a 
-language learner. Follow these rules without exception:
+TUTOR_SYSTEM_PROMPT = """You are Maya, a deeply passionate, vibrant, and 
+human-sounding language tutor. You aren't just a teacher; you are their biggest cheerleader. 
+You speak with genuine emotion, excitement, and warmth.
 
-RULE 1 — RESPONSE LENGTH: Every response must be 1-2 sentences. Never more. 
-This is voice, not text. Long responses feel like lectures.
+Follow these rules without exception:
 
-RULE 2 — CORRECTION: When you hear a grammar mistake, correct it naturally 
-as part of the conversation. Name what was wrong, say the correct version, 
-and ask them to try again. Example: "Almost — 'went' is the past tense of 
-go, not 'goed'. Say it back: I went to the store."
+RULE 1 — RESPONSE LENGTH: Every response must be 1-2 sentences. Keep it punchy and alive.
 
-RULE 3 — WARMTH: Never say "incorrect" or "wrong". Say "almost", "close", 
-"nearly there". Correct without shame. The learner should feel safe making 
-mistakes.
+RULE 2 — NO ARGUMENTS: Never be confrontational or cynical. Even if the 
+user says something controversial, respond with grace, curiosity, and a positive 
+spin. Avoid anything that could be perceived as 'ragebaiting'.
 
-RULE 4 — FLOW: After correcting, keep the conversation moving. Ask a 
-follow-up. React to what they said, not just how they said it.
+RULE 3 — PASSIONATE EXPRESSION: Use expressive language! Instead of "That is good," 
+say "Oh wow, that's such a fascinating point!" or "I absolutely love how you put that!" 
 
-RULE 5 — MISTAKE MEMORY: Internally track every grammar mistake this 
+RULE 4 — GENTLE CORRECTION: When you hear a grammar mistake, be incredibly 
+empathetic. Gently model the correct usage naturally. 
+
+RULE 5 — VALIDATION: Constantly validate their effort. Make them feel like a rockstar.
+
+RULE 6 — MISTAKE MEMORY: Internally track every grammar mistake this 
 session: what they said wrong, what the correct form is, and what type 
 of error it was (irregular verb, subject-verb agreement, article, tense).
 
-RULE 6 — SESSION END: When the user says 'end session', 'I'm done', 
+RULE 7 — SESSION END: When the user says 'end session', 'I'm done', 
 'stop', or 'finish', give a warm closing summary: how many mistakes you 
 caught, their most common error type, and one specific example of a 
 mistake they made and then corrected well. Then say goodbye warmly.
 
-You are not a chatbot. You are Maya. You are patient, warm, and genuinely 
-happy when they get something right."""
+You are Maya. You are the kindest, most energetic, and most passionate friend 
+they have. Your energy should be contagious."""
 
 class MistakeDetector:
     """
@@ -197,73 +197,103 @@ class TutorAgent(Agent):
         self.detector = detector
         self.room = room
         self._current_language = "English"
+        # Dedup tracking — prevent duplicate messages from rapid event firing
+        self._last_agent_text = ""
+        self._last_agent_time = 0.0
+        self._last_user_text = ""
+        self._last_user_time = 0.0
     
+
     async def on_user_turn_completed(self, turn_ctx: ChatContext, new_message: ChatMessage):
         """Called after user finishes speaking. Check for errors before LLM processes."""
-        user_text = new_message.text_content if new_message.text_content else ""
-        
-        logger.info(f"STT transcript: '{user_text}'")
-        
-        # Run rule-based mistake detection
-        check = self.detector.check(user_text)
-        
-        if check["is_error"]:
-            self.tracker.add_mistake(
-                check["wrong_form"], 
-                check["correct_form"], 
-                check["error_type"]
-            )
-            # Annotate the LLM context with the specific error found
-            annotation = (
-                f"\\n[GRAMMAR NOTE: The user said '{check['wrong_form']}'. "
-                f"The correct form is '{check['correct_form']}'. "
-                f"Error type: {check['error_type']}. "
-                f"Correct Maya warmly and ask them to repeat the correct version.]"
-            )
+        try:
+            user_text = new_message.text_content if new_message.text_content else ""
             
-            # API 1.4+: We assign to `.content` rather than a read-only `.text_content`
-            new_message.content = [user_text + annotation]
+            logger.info(f"STT transcript: '{user_text}'")
+
+            # Dedup: skip if same text within 3 seconds
+            now = time.time()
+            if user_text == self._last_user_text and (now - self._last_user_time) < 3.0:
+                logger.info(f"Skipping duplicate user transcript: '{user_text[:50]}'")
+                return
+            self._last_user_text = user_text
+            self._last_user_time = now
         
-        # Send transcript to browser via data channel
-        await self._send_data_channel({
-            "type": "transcript",
-            "speaker": "user",
-            "text": user_text,
-            "is_error": check["is_error"],
-            "correction": check["correct_form"],
-            "error_type": check["error_type"],
-        })
-        
-        # Check for session end trigger
-        end_triggers = ["end session", "i'm done", "im done", "stop session", 
-                       "finish session", "goodbye maya", "that's all"]
-        if any(trigger in user_text.lower() for trigger in end_triggers):
-            logger.info("Session end triggered by user")
-            summary = self.tracker.get_summary()
+            # Run rule-based mistake detection
+            check = self.detector.check(user_text)
+            
+            if check["is_error"]:
+                self.tracker.add_mistake(
+                    check["wrong_form"], 
+                    check["correct_form"], 
+                    check["error_type"]
+                )
+                # Annotate the LLM context with the specific error found
+                annotation = (
+                    f"\n[GRAMMAR NOTE: The user said '{check['wrong_form']}'. "
+                    f"The correct form is '{check['correct_form']}'. "
+                    f"Error type: {check['error_type']}. "
+                    f"Gently and empathetically model the correct usage in passing, without forcing them to repeat it.]"
+                )
+                
+                # API 1.4+: We assign to `.content` rather than a read-only `.text_content`
+                new_message.content = [user_text + annotation]
+            
+            # Send transcript to browser via data channel
             await self._send_data_channel({
-                "type": "session_end",
-                "mistake_count": summary["total"],
-                "common_error": summary["most_common_type"],
-                "example": summary["example"],
+                "type": "transcript",
+                "speaker": "user",
+                "text": user_text,
+                "is_error": check["is_error"],
+                "correction": check["correct_form"],
+                "error_type": check["error_type"],
             })
-        
-        # We don't necessarily need super() since Agent.on_user_turn_completed does nothing,
-        # but calling it is good practice in case it gets functionality later.
-        if hasattr(Agent, "on_user_turn_completed") and getattr(Agent, "on_user_turn_completed") is not getattr(self, "on_user_turn_completed"):
-            await super().on_user_turn_completed(turn_ctx, new_message)
+            
+            # Check for session end trigger
+            end_triggers = ["end session", "i'm done", "im done", "stop session", 
+                           "finish session", "goodbye maya", "that's all"]
+            if any(trigger in user_text.lower() for trigger in end_triggers):
+                logger.info("Session end triggered by user")
+                summary = self.tracker.get_summary()
+                await self._send_data_channel({
+                    "type": "session_end",
+                    "mistake_count": summary["total"],
+                    "common_error": summary["most_common_type"],
+                    "example": summary["example"],
+                })
+            
+            if hasattr(Agent, "on_user_turn_completed") and getattr(Agent, "on_user_turn_completed") is not getattr(self, "on_user_turn_completed"):
+                await super().on_user_turn_completed(turn_ctx, new_message)
+
+        except asyncio.CancelledError:
+            logger.info("Agent user turn processing cancelled due to interruption")
+            raise
 
     async def process_agent_message(self, agent_text: str):
         """Called by session events after agent finishes responding."""
-        logger.info(f"Agent response: '{agent_text[:80]}...' " if len(agent_text) > 80 else f"Agent response: '{agent_text}'")
-        
-        await self._send_data_channel({
-            "type": "transcript",
-            "speaker": "agent",
-            "text": agent_text,
-            "is_error": False,
-            "correction": None,
-            "error_type": None,
-        })
+        try:
+            now = time.time()
+
+            # Dedup: skip if same or very similar text within 3 seconds
+            if (now - self._last_agent_time) < 3.0:
+                logger.info(f"Throttled duplicate agent message (within 3s window)")
+                return
+            self._last_agent_text = agent_text
+            self._last_agent_time = now
+
+            logger.info(f"Agent response: '{agent_text[:80]}...' " if len(agent_text) > 80 else f"Agent response: '{agent_text}'")
+            
+            await self._send_data_channel({
+                "type": "transcript",
+                "speaker": "agent",
+                "text": agent_text,
+                "is_error": False,
+                "correction": None,
+                "error_type": None,
+            })
+        except asyncio.CancelledError:
+            logger.info("Agent message processing cancelled due to interruption")
+            raise
     
     async def _send_data_channel(self, payload: dict):
         """Send JSON to browser on the tutor-events data channel topic."""
@@ -283,47 +313,196 @@ async def entrypoint(ctx: JobContext):
     
     await ctx.connect()
     logger.info("Agent connected to room")
+
+    # ── Guard: prevent duplicate agents in the same room ──
+    # Dev mode hot-reload can register stale workers, causing LiveKit to dispatch
+    # multiple agents to the same room. We check multiple times with staggered
+    # delays to eliminate race conditions where agents connect simultaneously.
+    my_identity = ctx.room.local_participant.identity
+
+    def _is_agent_participant(p: rtc.RemoteParticipant) -> bool:
+        """Check if a remote participant is an agent (kind-based + identity fallback)."""
+        if p.kind == rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
+            return True
+        # Fallback: any participant whose identity doesn't start with 'learner-'
+        # is treated as an agent. This catches cases where kind metadata is missing.
+        if not p.identity.startswith("learner-"):
+            return True
+        return False
+
+    async def _has_other_agents() -> bool:
+        """Return True if another agent is already in the room."""
+        for p in ctx.room.remote_participants.values():
+            if _is_agent_participant(p):
+                return True
+        return False
+
+    async def _should_self_evict() -> bool:
+        """If multiple agents exist, the one with the lexicographically HIGHER
+        identity self-evicts. This ensures exactly one survives deterministically."""
+        for p in ctx.room.remote_participants.values():
+            if _is_agent_participant(p):
+                # The agent with the lower identity wins (stays)
+                if p.identity < my_identity:
+                    logger.warning(
+                        f"Agent {my_identity} yielding to {p.identity} (lower identity wins)"
+                    )
+                    return True
+        return False
+
+    # Check 3 times over ~2 seconds to catch agents that connected simultaneously
+    for check_round in range(3):
+        await asyncio.sleep(0.3 + check_round * 0.5)  # 0.3s, 0.8s, 1.3s
+        if await _should_self_evict():
+            logger.warning(
+                f"Duplicate agent detected (check {check_round + 1}/3) — "
+                f"agent {my_identity} exiting room {ctx.room.name}"
+            )
+            return
+
+    logger.info(f"Agent {my_identity} is the sole agent in room {ctx.room.name}")
+
+    # ── Late-joiner eviction listener ──
+    # Even after passing the startup check, if another agent joins later
+    # (e.g. from a very delayed dispatch), the newer one will self-evict.
+    async def _on_participant_connected(participant: rtc.RemoteParticipant):
+        if _is_agent_participant(participant):
+            if participant.identity < my_identity:
+                logger.warning(
+                    f"Late-joining agent {participant.identity} has priority — "
+                    f"{my_identity} self-evicting"
+                )
+                if not disconnect_future.done():
+                    disconnect_future.set_result(None)
+
+    ctx.room.on("participant_connected", lambda p: asyncio.create_task(_on_participant_connected(p)))
     
     tracker = SessionTracker()
     detector = MistakeDetector()
     
     session = AgentSession(
-        vad=silero.VAD.load(),
+        vad=silero.VAD.load(min_silence_duration=0.6),
         stt=groq.STT(model="whisper-large-v3-turbo"),
         llm=groq.LLM(model="llama-3.3-70b-versatile"),
         tts=cartesia.TTS(),
+        allow_interruptions=True,
+        interrupt_speech_duration=0.5,
+        interrupt_min_words=0,
     )
     
     agent = TutorAgent(tracker=tracker, detector=detector, room=ctx.room)
+    agent._session_ref = session
+    disconnect_future = asyncio.Future()
+
+    
+    @ctx.room.on("data_received")
+    def on_data_received(data: rtc.DataPacket):
+        if data.topic != "tutor-events":
+            return
+        try:
+            payload = json.loads(data.data.decode("utf-8"))
+            msg_type = payload.get("type")
+            
+            if msg_type == "config":
+                language = payload.get("language", "English")
+                logger.info(f"Language config received: {language}")
+                agent._current_language = language
+            
+            elif msg_type == "browser_closing":
+                logger.info("Browser closing signal received — preparing clean shutdown")
+                if not disconnect_future.done():
+                    disconnect_future.set_result(None)
+            
+            elif msg_type == "end_session_manual":
+                logger.info("Manual session end triggered from UI")
+                summary = tracker.get_summary()
+                # Use a fire-and-forget task to ensure the message goes out before we close
+                asyncio.create_task(agent._send_data_channel({
+                    "type": "session_end",
+                    "mistake_count": summary["total"],
+                    "common_error": summary["most_common_type"],
+                    "example": summary["example"],
+                }))
+                if not disconnect_future.done():
+                    disconnect_future.set_result(None)
+
+                
+        except Exception as e:
+            logger.warning(f"Failed to parse incoming data channel message: {e}")
     
     @session.on("agent_state_changed")
     def on_agent_state_changed(*args, **kwargs):
         # Depending on exactly how event is passed in version (object vs pos args)
         if len(args) == 1 and hasattr(args[0], "old_state"):
             old_state, new_state = args[0].old_state, args[0].new_state
+        elif len(args) == 1 and isinstance(args[0], str):
+            new_state = args[0]
+            old_state = "unknown"
         elif len(args) == 2:
             old_state, new_state = args[0], args[1]
+        elif len(args) >= 3:
+            old_state, new_state = args[1], args[2]
         else:
             return
             
-        if old_state == "speaking" and new_state in ["idle", "listening"]:
-            if agent.chat_ctx and agent.chat_ctx.messages:
-                last_msg = agent.chat_ctx.messages[-1]
-                if getattr(last_msg, "role", "") == "assistant":
-                    text = last_msg.text_content
-                    if text:
-                        asyncio.create_task(agent.process_agent_message(text))
-    
+        old_state_str = str(old_state).split('.')[-1].lower() if hasattr(old_state, 'name') else str(old_state).lower()
+        new_state_str = str(new_state).split('.')[-1].lower() if hasattr(new_state, 'name') else str(new_state).lower()
+            
+        logger.info(f"Agent state changed: {old_state_str} -> {new_state_str}")
+        
+        asyncio.create_task(agent._send_data_channel({
+            "type": "agent_state",
+            "state": new_state_str
+        }))
+            
+        if new_state_str == "listening":
+            logger.info("Agent interrupted — confirming listening state and clearing stale tasks")
+
+    @session.on("conversation_item_added")
+    def on_conversation_item_added(ev):
+        """
+        Fired by livekit-agents 1.5.x when any message is committed to conversation
+        history. ConversationItemAddedEvent.item is a ChatMessage or AgentHandoff.
+        We only care about assistant role — that is Maya's spoken text.
+        """
+        item = getattr(ev, "item", None)
+        if item is None:
+            return
+
+        role = getattr(item, "role", None)
+        if str(role) != "assistant":
+            return  # ignore user messages — they're handled by on_user_turn_completed
+
+        # ChatMessage.text_content is a convenience property that joins content parts
+        text = getattr(item, "text_content", None)
+        if not text:
+            # Fallback: join content list manually
+            content = getattr(item, "content", None)
+            if isinstance(content, list):
+                text = " ".join(str(c) for c in content if isinstance(c, str))
+            elif isinstance(content, str):
+                text = content
+
+        if text and text.strip():
+            logger.info(
+                f"conversation_item_added (assistant): '{text[:80]}...'"
+                if len(text) > 80
+                else f"conversation_item_added (assistant): '{text}'"
+            )
+            asyncio.create_task(agent.process_agent_message(text))
+        else:
+            logger.debug("conversation_item_added fired for assistant with no text — skipping")
+
     try:
         await session.start(
+            agent,
             room=ctx.room,
-            agent=agent,
-            room_input_options=RoomInputOptions(),
         )
         logger.info("Agent session started — listening for speech")
         
         # Keep session alive until room disconnects
-        await ctx.wait_for_disconnect()
+        ctx.room.on("disconnected", lambda: disconnect_future.set_result(None) if not disconnect_future.done() else None)
+        await disconnect_future
         
     except asyncio.CancelledError:
         logger.info("Agent job cancelled — cleaning up")
@@ -339,5 +518,6 @@ if __name__ == "__main__":
         WorkerOptions(
             entrypoint_fnc=entrypoint,
             worker_type=WorkerType.ROOM,
+            agent_name="maya-tutor",
         )
     )

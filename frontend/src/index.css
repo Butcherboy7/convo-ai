@@ -23,3 +23,27 @@ body {
   border-radius: 2px; 
 }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a45; }
+
+h1, h2, h3 { 
+  letter-spacing: -0.02em; 
+  font-weight: 600;
+}
+
+.mono { 
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.95em;
+  line-height: 1.6;
+}
+
+.accent-glow {
+  color: #f59e0b;
+  text-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.25s ease-out forwards;
+}

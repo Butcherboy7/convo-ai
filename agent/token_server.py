@@ -8,8 +8,9 @@ Add Google OAuth or similar before any public deployment.
 import os
 import logging
 import uuid
+import time
 import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from livekit import api as livekit_api
@@ -29,53 +30,116 @@ if missing:
 
 app = FastAPI(title="Language Tutor Token Server")
 
-# Comment: "Add production domain here before deploying"
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  
-    allow_credentials=True,
-    allow_methods=["GET"],
-    allow_headers=["*"],
-)
+_ROOM_TTL_SECONDS = 3600
+_active_room = None
 
 @app.get("/token")
-def get_token():
+async def get_token(request: Request):
     try:
-        identity = f"learner-{uuid.uuid4().hex[:8]}"
+        global _active_room
+        if not _active_room or _active_room.get("expires_at", 0) < time.time() + 60:
+            room_name = f"language-session-{uuid.uuid4().hex[:6]}"
+            _active_room = {
+                "name": room_name,
+                "expires_at": time.time() + _ROOM_TTL_SECONDS
+            }
+        else:
+            room_name = _active_room["name"]
+
+        # Accept identity from frontend (sessionStorage-based) for stable reconnects.
+        # Falls back to a new UUID if not provided.
+        identity = request.query_params.get("identity")
+        if not identity or not identity.strip():
+            identity = f"learner-{uuid.uuid4().hex[:8]}"
+
         api_key = os.environ.get("LIVEKIT_API_KEY")
         api_secret = os.environ.get("LIVEKIT_API_SECRET")
-        
+        livekit_url = os.environ["LIVEKIT_URL"]
+
         token = livekit_api.AccessToken(api_key, api_secret)
         token.with_identity(identity)
         token.with_name(identity)
         token.with_grants(livekit_api.VideoGrants(
-            room="language-session",
+            room=room_name,
             room_join=True,
             can_publish=True,
             can_subscribe=True,
             can_publish_data=True,
         ))
-        
-        # Livekit AccessToken usually expects timedelta for ttl
-        token.with_ttl(datetime.timedelta(seconds=7200))
-        
+        token.with_ttl(datetime.timedelta(seconds=_ROOM_TTL_SECONDS))
         jwt_string = token.to_jwt()
-        
-        logger.info(f"Token issued — identity: {identity}")
-        
+
+        logger.info(f"Token issued — identity: {identity}, room: {room_name}")
+
+        # ── Explicit agent dispatch (only if no agent is already in the room) ──
+        # With agent_name set on the worker, LiveKit will NOT auto-dispatch.
+        # We must explicitly request dispatch here.
+        try:
+            lk = livekit_api.LiveKitAPI(
+                url=livekit_url,
+                api_key=api_key,
+                api_secret=api_secret,
+            )
+            try:
+                # Ensure the room exists before dispatching — LiveKit creates rooms
+                # lazily on first join, but dispatch needs the room to exist already.
+                await lk.room.create_room(
+                    livekit_api.CreateRoomRequest(
+                        name=room_name,
+                        empty_timeout=300,  # 5 min idle timeout
+                    )
+                )
+
+                room_info = await lk.room.list_participants(
+                    livekit_api.ListParticipantsRequest(room=room_name)
+                )
+                agent_already_present = any(
+                    p.identity.startswith("agent-") or "maya" in p.identity.lower()
+                    for p in room_info.participants
+                )
+
+                if not agent_already_present:
+                    await lk.agent_dispatch.create_dispatch(
+                        livekit_api.CreateAgentDispatchRequest(
+                            agent_name="maya-tutor",
+                            room=room_name,
+                        )
+                    )
+                    logger.info(f"Agent dispatch triggered for room: {room_name}")
+                else:
+                    logger.info("Agent already in room — skipping dispatch")
+            except Exception as e:
+                logger.warning(f"Agent dispatch check failed: {e}")
+                # Do not block token issuance if dispatch check fails
+            finally:
+                await lk.aclose()
+        except Exception as e:
+            logger.warning(f"LiveKit API client creation failed: {e}")
+
         return {
             "token": jwt_string,
-            "url": os.environ["LIVEKIT_URL"],
-            "room": "language-session",
+            "url": livekit_url,
+            "room": room_name,
             "identity": identity
         }
     except Exception as e:
         logger.exception("Token generation failed")
         raise HTTPException(status_code=500, detail="Token generation failed")
 
+
+@app.post("/new-session")
+async def new_session():
+    """Explicitly invalidate the current room so the next /token creates a fresh one."""
+    global _active_room
+    old = _active_room
+    _active_room = None
+    logger.info(f"Session cleared — old room: {old['name'] if old else 'none'}")
+    return {"status": "cleared"}
+
+
 @app.get("/health")
 def health_check():
-    return { "status": "ok", "service": "language-tutor-token-server" }
+    return {"status": "ok", "service": "language-tutor-token-server"}
 
 if __name__ == "__main__":
     import uvicorn
