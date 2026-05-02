@@ -1,149 +1,79 @@
-# 🎙️ Convo AI — Voice Language Tutor
+# Convo AI: Your Personal AI Language Tutor 🎙️✨
 
-**Convo AI** is a real-time, AI-powered spoken language tutor. It listens to you speak, catches grammar mistakes instantly, corrects you warmly, and maintains a natural conversation flow.
-
-Built with **LiveKit Components**, **Groq (Llama 3 & Whisper)**, and **Cartesia**, this project demonstrates high-performance AI voice interaction with ultra-low latency.
+Convo AI is a real-time, voice-first language tutoring system powered by **LiveKit**, **Groq**, and **Cartesia**. It features **Maya**, a passionate and empathetic AI tutor designed to help you practice languages through natural conversation.
 
 ---
 
-## ✨ Features
+## 🚀 Quick Start (Local Setup)
 
-- **Real-time Voice Interaction**: Zero-button interface. Just speak naturally.
-- **Instant Grammar Correction**: Maya (the AI tutor) catches irregular verb errors, subject-verb agreement issues, and article mistakes using a high-speed rule-based pre-processor.
-- **Deep Contextual Learning**: LLM-driven feedback ensures corrections are explained naturally within the conversation.
-- **Session Summaries**: Get a full report of your mistakes and progress when you finish the session.
-- **Ultra-low Latency**: Powered by LiveKit Cloud and Groq's high-speed inference.
-- **Premium UI/UX**: Minimalist, intentional design with responsive layouts and subtle micro-animations that communicate state effectively.
+Follow these exact steps to get Maya running on your computer in less than 5 minutes.
 
----
-
-## 🛠️ Technology Stack
-
-- **Frontend**: React 19, Vite, Tailwind CSS, @livekit/components-react
-- **Backend**: Python 3.12, FastAPI (Token Server)
-- **AI Agent**: LiveKit Agents SDK
-- **STT & LLM**: Groq (Whisper-large-v3-turbo, Llama-3.3-70b-versatile)
-- **TTS**: Cartesia (Sonic-english)
-- **VAD**: Silero VAD (Local)
-
----
-
-## 🚀 Getting Started (Spoon-fed)
-
-Follow these steps exactly to get your own AI Tutor running.
-
-### 1. Prerequisites
-Before you start, make sure you have these installed:
-- **Python 3.12+**: [Download here](https://www.python.org/downloads/)
-- **Node.js 18+**: [Download here](https://nodejs.org/)
-
-You also need to grab your API keys from:
-- [LiveKit Cloud](https://cloud.livekit.io) (Project URL, API Key, API Secret)
-- [Groq](https://console.groq.com) (API Key)
-- [Cartesia](https://play.cartesia.ai) (API Key)
-
----
-
-### 2. Installation (Step-by-Step)
-
-#### Step A: Clone the Project
-Open your terminal/command prompt and run:
+### 1. Clone & Install
+Open your terminal and run:
 ```bash
+# Clone the project
 git clone https://github.com/Butcherboy7/convo-ai.git
 cd convo-ai
+
+# Install everything
+cd agent && pip install -r requirements.txt
+cd ../frontend && npm install
+cd ..
 ```
 
-#### Step B: Setup the Backend
-In the same terminal, run these commands one by one:
+### 2. Set Up API Keys
+1. Create a file named `.env` inside the `agent/` folder.
+2. Paste the following and add your keys:
+```env
+LIVEKIT_URL=wss://your-project.livekit.cloud
+LIVEKIT_API_KEY=your-api-key
+LIVEKIT_API_SECRET=your-api-secret
+GROQ_API_KEY=your-groq-key
+CARTESIA_API_KEY=your-cartesia-key
+```
+
+### 3. Run It (3 Terminals)
+
+**Terminal 1: Security Server**
 ```bash
 cd agent
-python -m venv venv
-
-# On Windows:
-venv\Scripts\activate
-# On Mac/Linux:
-source venv/bin/activate
-
-pip install -r requirements.txt
-cp .env.example .env
-```
-**Now, open the `agent/.env` file** in your favorite text editor (Notepad, VS Code, etc.) and paste your API keys into the quotes.
-
-#### Step C: Setup the Frontend
-Open a **new terminal window**, navigate to the project folder, and run:
-```bash
-cd frontend
-npm install
-```
-
----
-
-### 3. How to Run (Keep all 3 terminals open!)
-
-To start the tutor, you need to have **3 terminals** running at the same time:
-
-**Terminal 1: Token Server**
-```bash
-cd agent
-# (Make sure venv is active)
 python token_server.py
 ```
 
-**Terminal 2: AI Agent (Maya's Brain)**
+**Terminal 2: Maya's Brain (The Agent)**
 ```bash
 cd agent
-# (Make sure venv is active)
 python agent.py dev
 ```
 
-**Terminal 3: Frontend (The Website)**
+**Terminal 3: The Website**
 ```bash
 cd frontend
 npm run dev
 ```
 
-**Done!** Now open **[http://localhost:5173](http://localhost:5173)** in your browser and click "Start Session".
+**Done!** Open **[http://localhost:5173](http://localhost:5173)** and start talking!
 
+---
 
+## 🌍 Cloud Deployment
+
+If you want to host this for others to use:
+
+### Option A: AWS (Recommended with Credits)
+1.  **Backend**: Use **AWS App Runner**. Point it to your repo, use the `Dockerfile`, and set port `8000`.
+2.  **Frontend**: Use **AWS Amplify**. Set `VITE_TOKEN_SERVER_URL` to your App Runner link + `/token`.
+
+### Option B: Render (Easiest Free Tier)
+1.  Click **New +** > **Blueprint** on Render.
+2.  Connect this repo and enter your API keys.
+3.  Update the frontend `VITE_TOKEN_SERVER_URL` in the Render dashboard once live.
 
 ---
 
 ## 📖 Architecture
+1. **Agent**: Handles voice, logic, and grammar (Python/LiveKit).
+2. **Frontend**: The beautiful interface (React/Vite).
+3. **Token Server**: Issues secure access keys (FastAPI).
 
-The project follows a "Thin Client, Thick Agent" philosophy:
-1. **Agent**: Holds all conversation state, handles VAD/STT/LLM/TTS, and performs grammar analysis.
-2. **Frontend**: A pure rendering layer that connects to LiveKit and listens for `tutor-events` via data channels.
-3. **Token Server**: Signs JWTs for secure room access.
-
-See [HANDOFF.md](HANDOFF.md) for detailed technical specifications and the current development roadmap.
-
----
-
-## 🚀 Deployment (AWS - Recommended)
-
-Since you have AWS credits, this is the best way to run Maya with high performance.
-
-### 1. Backend (AWS App Runner)
-1.  Go to **[AWS App Runner](https://console.aws.amazon.com/apprunner/home)**.
-2.  Click **Create Service**.
-3.  Source: **Source code repository**, connect your GitHub.
-4.  Repo: `convo-ai`, Branch: `main`, Deployment: **Automatic**.
-5.  Build Settings: 
-    *   Configuration source: **Configure all settings here**
-    *   Runtime: **Docker**
-6.  Service Configuration:
-    *   Port: **8000**
-    *   **Environment Variables**: Add your `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `GROQ_API_KEY`, and `CARTESIA_API_KEY`.
-7.  Click **Create Service**. Once live, copy the URL (e.g., `https://xxxx.awsapprunner.com`).
-
-### 2. Frontend (AWS Amplify)
-1.  Go to **[AWS Amplify](https://console.aws.amazon.com/amplify/home)**.
-2.  Click **New App** > **Host web app**.
-3.  Connect your GitHub repo.
-4.  **Advanced Settings**: Add an Environment Variable:
-    *   Key: `VITE_TOKEN_SERVER_URL`
-    *   Value: `https://YOUR-APP-RUNNER-URL.com/token`
-5.  Click **Save and Deploy**.
-
-**Maya is now live on AWS!**
-
+See [HANDOFF.md](HANDOFF.md) for full technical details.
