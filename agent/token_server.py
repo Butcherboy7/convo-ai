@@ -30,6 +30,15 @@ if missing:
 
 app = FastAPI(title="Language Tutor Token Server")
 
+# Add CORS middleware to allow the frontend to talk to the backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 _ROOM_TTL_SECONDS = 3600
 _active_room = None
 
