@@ -69,9 +69,9 @@ export default function VoiceSession({ agentStateOverride }) {
         {/* Outer glow ring when listening */}
         {isActive && (
           <div style={{
-            position: 'absolute', width: '96px', height: '96px', borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(129,140,248,0.08) 0%, transparent 70%)',
-            animation: 'mic-pulse 2s ease-out infinite',
+            position: 'absolute', width: '100%', height: '100%', borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(129,140,248,0.2) 0%, transparent 70%)',
+            animation: 'mic-pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
           }} />
         )}
         <button
@@ -82,7 +82,7 @@ export default function VoiceSession({ agentStateOverride }) {
             background: isMicMuted
               ? 'rgba(30,30,42,0.8)'
               : isActive
-                ? 'linear-gradient(135deg, rgba(129,140,248,0.15), rgba(99,102,241,0.1))'
+                ? 'linear-gradient(135deg, rgba(129,140,248,0.2), rgba(99,102,241,0.15))'
                 : 'rgba(30,30,42,0.6)',
             border: isActive
               ? '2px solid rgba(129,140,248,0.5)'

@@ -3,11 +3,11 @@ import React, { useRef, useEffect } from 'react';
 export default function Transcript({ messages }) {
   const containerRef = useRef(null);
 
+  const messagesEndRef = useRef(null);
+
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'smooth' });
-    }
-  }, [messages.length]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   if (messages.length === 0) {
     return (
@@ -68,11 +68,12 @@ export default function Transcript({ messages }) {
               borderLeft: (isUser && msg.is_error)
                 ? '3px solid #818cf8'
                 : ((!isUser) ? '2px solid rgba(129,140,248,0.15)' : 'none'),
-              padding: '10px 14px',
-              color: '#e2e2ea',
-              fontSize: '14px',
-              lineHeight: 1.7,
-              letterSpacing: '0.01em'
+              padding: '12px 16px',
+              color: '#f4f4f5',
+              fontSize: '15px',
+              lineHeight: 1.6,
+              letterSpacing: '0.01em',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
             }}>
               {msg.text}
               {(isUser && msg.is_error && msg.correction) && (
@@ -94,6 +95,7 @@ export default function Transcript({ messages }) {
           </div>
         );
       })}
+      <div ref={messagesEndRef} />
       </div>
     </div>
   );
