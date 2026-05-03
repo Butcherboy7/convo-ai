@@ -393,8 +393,6 @@ async def entrypoint(ctx: JobContext):
         llm=groq.LLM(model="llama-3.3-70b-versatile"),
         tts=cartesia.TTS(),
         allow_interruptions=True,
-        interrupt_speech_duration=0.5,
-        interrupt_min_words=0,
     )
     
     agent = TutorAgent(tracker=tracker, detector=detector, room=ctx.room)
