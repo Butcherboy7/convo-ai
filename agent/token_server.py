@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import sentry_sdk
 from livekit import api as livekit_api
 
 logging.basicConfig(
@@ -24,6 +25,14 @@ logging.basicConfig(
 logger = logging.getLogger("token_server")
 
 load_dotenv()
+
+# Initialize Sentry for error tracking
+if os.environ.get("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.environ.get("SENTRY_DSN"),
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+    )
 
 required = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"]
 missing = [var for var in required if not os.environ.get(var)]
@@ -44,7 +53,7 @@ app.add_middleware(
 _ROOM_TTL_SECONDS = 3600
 _active_room = None
 
-@app.get("/token")
+@app.get("/api/token")
 async def get_token(request: Request):
     try:
         global _active_room
@@ -118,7 +127,7 @@ async def get_token(request: Request):
         raise HTTPException(status_code=500, detail="Token generation failed")
 
 
-@app.post("/new-session")
+@app.post("/api/new-session")
 async def new_session():
     """Explicitly invalidate the current room so the next /token creates a fresh one."""
     global _active_room

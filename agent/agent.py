@@ -11,6 +11,7 @@ import json
 import time
 import asyncio
 from dotenv import load_dotenv
+import sentry_sdk
 from livekit import rtc
 from livekit.agents import (
     AgentSession,
@@ -30,6 +31,15 @@ logging.basicConfig(
 logger = logging.getLogger("tutor-agent")
 
 load_dotenv()
+
+# Initialize Sentry for error tracking
+if os.environ.get("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.environ.get("SENTRY_DSN"),
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+    )
+
 required_vars = [
     "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
     "GROQ_API_KEY", "CARTESIA_API_KEY"
@@ -350,15 +360,12 @@ async def entrypoint(ctx: JobContext):
                     return True
         return False
 
-    # Check 3 times over ~2 seconds to catch agents that connected simultaneously
-    for check_round in range(3):
-        await asyncio.sleep(0.3 + check_round * 0.5)  # 0.3s, 0.8s, 1.3s
-        if await _should_self_evict():
-            logger.warning(
-                f"Duplicate agent detected (check {check_round + 1}/3) — "
-                f"agent {my_identity} exiting room {ctx.room.name}"
-            )
-            return
+    # Production mode: instant check (no delays required since hot-reloads are disabled)
+    if await _should_self_evict():
+        logger.warning(
+            f"Duplicate agent detected — agent {my_identity} exiting room {ctx.room.name}"
+        )
+        return
 
     logger.info(f"Agent {my_identity} is the sole agent in room {ctx.room.name}")
 
