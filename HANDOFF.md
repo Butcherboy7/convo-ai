@@ -47,3 +47,18 @@ Frontend: /frontend/.env.local (VITE_TOKEN_SERVER_URL=http://localhost:5173/api)
 - [x] Phase 3c: Personality & UX optimization — passionate tone + interruption tuning
 - [ ] Phase 4: Persistence — save session summaries to a database
 
+## EC2 Update & Run Command
+To pull the latest changes and restart the server manually in one go on your EC2 instance, copy and paste this single command:
+```bash
+cd ~/convo-ai && git pull origin main && sudo lsof -i :8081 -t | xargs -r sudo kill -9 && cd frontend && npm install && npm run build && cd ../agent && source venv/bin/activate && nohup bash start.sh > server.log 2>&1 &
+```
+*(This command pulls the code, kills the old server, builds the frontend, and runs the backend in the background so you can close the terminal without stopping the app.)*
+
+## Continuous Deployment (GitHub Actions)
+A GitHub Actions workflow is located at `.github/workflows/deploy.yml`. Whenever you push to the `main` branch, it will automatically SSH into your EC2 instance and run the update command above.
+
+**Setup Required:**
+You must add the following Secrets to your GitHub Repository (Settings -> Secrets and variables -> Actions):
+1. `EC2_HOST` (Your EC2 Public IP address, e.g. `13.59.x.x`)
+2. `EC2_USERNAME` (The SSH username, e.g. `ubuntu`)
+3. `EC2_SSH_KEY` (The full contents of your `.pem` private SSH key file)

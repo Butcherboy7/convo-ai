@@ -1,0 +1,37 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Execute SSH Commands on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          echo "Starting automated deployment..."
+          cd ~/convo-ai
+          git pull origin main
+          
+          echo "Building frontend..."
+          cd frontend
+          npm install
+          npm run build
+          
+          echo "Restarting backend agent..."
+          cd ../agent
+          # Force kill the old agent occupying port 8081
+          sudo lsof -i :8081 -t | xargs -r sudo kill -9 || true
+          
+          # Activate virtual environment and start in background
+          source venv/bin/activate
+          nohup bash start.sh > server.log 2>&1 &
+          
+          echo "Deployment successful!"
